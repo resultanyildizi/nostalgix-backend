@@ -1,16 +1,17 @@
 package config
 
 import (
-	"github.com/go-ozzo/ozzo-validation/v4"
+	"io/ioutil"
+
+	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/qiangxue/go-env"
 	"github.com/qiangxue/go-rest-api/pkg/log"
 	"gopkg.in/yaml.v2"
-	"io/ioutil"
 )
 
 const (
-	defaultServerPort         = 8080
-	defaultJWTExpirationHours = 72
+	defaultServerPort       = 8080
+	defaultJWTExpirationMin = 15
 )
 
 // Config represents an application configuration.
@@ -38,7 +39,7 @@ func Load(file string, logger log.Logger) (*Config, error) {
 	// default config
 	c := Config{
 		ServerPort:    defaultServerPort,
-		JWTExpiration: defaultJWTExpirationHours,
+		JWTExpiration: defaultJWTExpirationMin,
 	}
 
 	// load from YAML config file

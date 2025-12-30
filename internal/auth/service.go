@@ -2,18 +2,23 @@ package auth
 
 import (
 	"context"
+	"database/sql"
+	"time"
+
+	stderr "errors"
+
 	"github.com/dgrijalva/jwt-go"
 	"github.com/qiangxue/go-rest-api/internal/entity"
 	"github.com/qiangxue/go-rest-api/internal/errors"
 	"github.com/qiangxue/go-rest-api/pkg/log"
-	"time"
 )
 
 // Service encapsulates the authentication logic.
 type Service interface {
 	// authenticate authenticates a user using username and password.
 	// It returns a JWT token if authentication succeeds. Otherwise, an error is returned.
-	Login(ctx context.Context, username, password string) (string, error)
+	LoginUsername(ctx context.Context, username, password string) (string, error)
+	LoginAnonymous(ctx context.Context, deviceKey string) (string, error)
 }
 
 // Identity represents an authenticated user identity.
@@ -27,36 +32,43 @@ type Identity interface {
 type service struct {
 	signingKey      string
 	tokenExpiration int
+	repo            Repository
 	logger          log.Logger
 }
 
 // NewService creates a new authentication service.
-func NewService(signingKey string, tokenExpiration int, logger log.Logger) Service {
-	return service{signingKey, tokenExpiration, logger}
+func NewService(signingKey string, tokenExpiration int, repository Repository, logger log.Logger) Service {
+	return service{signingKey, tokenExpiration, repository, logger}
 }
 
 // Login authenticates a user and generates a JWT token if authentication succeeds.
 // Otherwise, an error is returned.
-func (s service) Login(ctx context.Context, username, password string) (string, error) {
-	if identity := s.authenticate(ctx, username, password); identity != nil {
-		return s.generateJWT(identity)
-	}
-	return "", errors.Unauthorized("")
-}
-
-// authenticate authenticates a user using username and password.
-// If username and password are correct, an identity is returned. Otherwise, nil is returned.
-func (s service) authenticate(ctx context.Context, username, password string) Identity {
+func (s service) LoginUsername(ctx context.Context, username, password string) (string, error) {
 	logger := s.logger.With(ctx, "user", username)
-
-	// TODO: the following authentication logic is only for demo purpose
+	var user entity.User
 	if username == "demo" && password == "pass" {
 		logger.Infof("authentication successful")
-		return entity.User{ID: "100", Name: "demo"}
+		user = entity.User{ID: "100", Name: "demo"}
+	}
+	return s.generateJWT(user)
+}
+
+func (s service) LoginAnonymous(ctx context.Context, deviceKey string) (string, error) {
+	// check if there is a user with the device key
+	user, err := s.repo.GetUserByDeviceKey(ctx, deviceKey)
+
+	if err != nil && stderr.Is(err, sql.ErrNoRows) {
+		user, err = s.repo.CreateAnonymousUser(ctx, deviceKey)
+		if err != nil {
+			s.logger.Errorf("There is an error while getting the user by device key %s %v", deviceKey, err)
+			return "", errors.InternalServerError("")
+		}
+	} else if err != nil {
+		s.logger.Errorf("There is an error while getting the user by device key %s %v", deviceKey, err)
+		return "", errors.InternalServerError("")
 	}
 
-	logger.Infof("authentication failed")
-	return nil
+	return s.generateJWT(user)
 }
 
 // generateJWT generates a JWT that encodes an identity.
@@ -64,6 +76,6 @@ func (s service) generateJWT(identity Identity) (string, error) {
 	return jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"id":   identity.GetID(),
 		"name": identity.GetName(),
-		"exp":  time.Now().Add(time.Duration(s.tokenExpiration) * time.Hour).Unix(),
+		"exp":  time.Now().Add(time.Duration(s.tokenExpiration) * time.Minute).Unix(),
 	}).SignedString([]byte(s.signingKey))
 }
