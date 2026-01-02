@@ -8,6 +8,7 @@ import (
 	stderr "errors"
 
 	"github.com/dgrijalva/jwt-go"
+	"github.com/google/uuid"
 	"github.com/qiangxue/go-rest-api/internal/entity"
 	"github.com/qiangxue/go-rest-api/internal/errors"
 	"github.com/qiangxue/go-rest-api/pkg/log"
@@ -17,8 +18,8 @@ import (
 type Service interface {
 	// authenticate authenticates a user using username and password.
 	// It returns a JWT token if authentication succeeds. Otherwise, an error is returned.
-	LoginUsername(ctx context.Context, username, password string) (string, error)
-	LoginAnonymous(ctx context.Context, deviceKey string) (string, error)
+	LoginUsername(ctx context.Context, username, password string) (entity.AuthTokens, error)
+	LoginAnonymous(ctx context.Context, deviceKey string) (entity.AuthTokens, error)
 }
 
 // Identity represents an authenticated user identity.
@@ -43,17 +44,27 @@ func NewService(signingKey string, tokenExpiration int, repository Repository, l
 
 // Login authenticates a user and generates a JWT token if authentication succeeds.
 // Otherwise, an error is returned.
-func (s service) LoginUsername(ctx context.Context, username, password string) (string, error) {
+func (s service) LoginUsername(ctx context.Context, username, password string) (entity.AuthTokens, error) {
 	logger := s.logger.With(ctx, "user", username)
 	var user entity.User
 	if username == "demo" && password == "pass" {
 		logger.Infof("authentication successful")
 		user = entity.User{ID: "100", Name: "demo"}
 	}
-	return s.generateJWT(user)
+
+	accessToken, err := s.generateJWT(user)
+
+	if err != nil {
+		return entity.AuthTokens{}, err
+	}
+	return entity.AuthTokens{
+		AccessToken:  accessToken,
+		RefreshToken: "",
+	}, nil
 }
 
-func (s service) LoginAnonymous(ctx context.Context, deviceKey string) (string, error) {
+func (s service) LoginAnonymous(ctx context.Context, deviceKey string) (entity.AuthTokens, error) {
+	var authTokens entity.AuthTokens
 	// check if there is a user with the device key
 	user, err := s.repo.GetUserByDeviceKey(ctx, deviceKey)
 
@@ -61,14 +72,31 @@ func (s service) LoginAnonymous(ctx context.Context, deviceKey string) (string, 
 		user, err = s.repo.CreateAnonymousUser(ctx, deviceKey)
 		if err != nil {
 			s.logger.Errorf("There is an error while getting the user by device key %s %v", deviceKey, err)
-			return "", errors.InternalServerError("")
+			return authTokens, errors.InternalServerError("")
 		}
 	} else if err != nil {
 		s.logger.Errorf("There is an error while getting the user by device key %s %v", deviceKey, err)
-		return "", errors.InternalServerError("")
+		return authTokens, errors.InternalServerError("")
 	}
 
-	return s.generateJWT(user)
+	accessToken, err := s.generateJWT(user)
+	if err != nil {
+		return authTokens, errors.Unauthorized("")
+	}
+
+	refreshToken := uuid.New().String()
+	refreshTokenHashed, err := jwt.New(jwt.SigningMethodHS256).SignedString([]byte(refreshToken))
+
+	err = s.repo.CreateNewRefreshToken(ctx, deviceKey, user.ID, refreshTokenHashed)
+
+	if err != nil {
+		return authTokens, err
+	}
+
+	authTokens.AccessToken = accessToken
+	authTokens.RefreshToken = refreshToken
+
+	return authTokens, nil
 }
 
 // generateJWT generates a JWT that encodes an identity.

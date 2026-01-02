@@ -1,0 +1,3 @@
+drop table refresh_token;
+drop index refresh_token_device_key_idx;
+drop index refresh_token_hashed_value_idx;

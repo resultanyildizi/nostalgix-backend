@@ -1,6 +1,8 @@
 package auth
 
 import (
+	"net/http"
+
 	routing "github.com/go-ozzo/ozzo-routing/v2"
 	"github.com/qiangxue/go-rest-api/internal/errors"
 	"github.com/qiangxue/go-rest-api/pkg/log"
@@ -24,14 +26,11 @@ func loginUsername(service Service, logger log.Logger) routing.Handler {
 			logger.With(c.Request.Context()).Errorf("invalid request: %v", err)
 			return errors.BadRequest("")
 		}
-
-		token, err := service.LoginUsername(c.Request.Context(), req.Username, req.Password)
+		authTokens, err := service.LoginUsername(c.Request.Context(), req.Username, req.Password)
 		if err != nil {
 			return err
 		}
-		return c.Write(struct {
-			Token string `json:"token"`
-		}{token})
+		return c.WriteWithStatus(authTokens, http.StatusOK)
 	}
 }
 
@@ -51,12 +50,10 @@ func loginAnonymous(service Service, logger log.Logger) routing.Handler {
 			return errors.BadRequest("Device key is required ")
 		}
 
-		token, err := service.LoginAnonymous(c.Request.Context(), req.DeviceKey)
+		authTokens, err := service.LoginAnonymous(c.Request.Context(), req.DeviceKey)
 		if err != nil {
 			return err
 		}
-		return c.Write(struct {
-			Token string `json:"token"`
-		}{token})
+		return c.WriteWithStatus(authTokens, http.StatusOK)
 	}
 }

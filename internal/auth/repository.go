@@ -15,6 +15,7 @@ import (
 type Repository interface {
 	GetUserByDeviceKey(ctx context.Context, deviceKey string) (entity.User, error)
 	CreateAnonymousUser(ctx context.Context, deviceKey string) (entity.User, error)
+	CreateNewRefreshToken(ctx context.Context, deviceKey, userID, hashedValue string) error
 }
 
 type repistory struct {
@@ -76,4 +77,34 @@ func (r repistory) CreateAnonymousUser(ctx context.Context, deviceKey string) (e
 	user.Name = username
 
 	return user, err
+}
+
+// CreateNewRefreshToken implements Repository.
+func (r repistory) CreateNewRefreshToken(ctx context.Context, deviceKey, userID, hashedValue string) error {
+
+	tx, err := r.db.DB().Begin()
+
+	_, err1 := tx.Update("refresh_token",
+		dbx.Params{"revoked_at": time.Now()},
+		dbx.HashExp{"device_key": deviceKey, "user_id": userID},
+	).Execute()
+
+	_, err2 := tx.Insert("refresh_token",
+		dbx.Params{
+			"id":           uuid.New().String(),
+			"device_key":   deviceKey,
+			"user_id":      userID,
+			"hashed_value": hashedValue,
+			"created_at":   time.Now(),
+			"expires_at":   time.Now().Add(time.Hour * 24 * 7),
+		},
+	).Execute()
+
+	if err1 != nil || err2 != nil {
+		err = tx.Rollback()
+	} else {
+		err = tx.Commit()
+	}
+
+	return err
 }
