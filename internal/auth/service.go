@@ -20,6 +20,7 @@ type Service interface {
 	// It returns a JWT token if authentication succeeds. Otherwise, an error is returned.
 	LoginUsername(ctx context.Context, username, password string) (entity.AuthTokens, error)
 	LoginAnonymous(ctx context.Context, deviceKey string) (entity.AuthTokens, error)
+	RefreshTokens(ctx context.Context, refreshToken, deviceKey string) (entity.AuthTokens, error)
 }
 
 // Identity represents an authenticated user identity.
@@ -79,13 +80,40 @@ func (s service) LoginAnonymous(ctx context.Context, deviceKey string) (entity.A
 		return authTokens, errors.InternalServerError("")
 	}
 
+	return s.createAuthTokens(ctx, user, deviceKey)
+}
+
+func (s service) RefreshTokens(ctx context.Context, refreshToken, deviceKey string) (entity.AuthTokens, error) {
+	var authTokens entity.AuthTokens
+	refreshTokenHashed, err := s.hashToken(refreshToken)
+
+	if err != nil {
+		return authTokens, err
+	}
+
+	userID, err := s.repo.ValidateRefreshToken(ctx, deviceKey, refreshTokenHashed)
+
+	if stderr.Is(err, sql.ErrNoRows) {
+		return authTokens, errors.Unauthorized("")
+	} else if err != nil {
+		return authTokens, errors.InternalServerError("")
+	}
+
+	user, err := s.repo.GetUserByUserID(ctx, userID)
+
+	return s.createAuthTokens(ctx, user, deviceKey)
+}
+
+func (s service) createAuthTokens(ctx context.Context, user entity.User, deviceKey string) (entity.AuthTokens, error) {
+	var authTokens entity.AuthTokens
+
 	accessToken, err := s.generateJWT(user)
 	if err != nil {
 		return authTokens, errors.Unauthorized("")
 	}
 
 	refreshToken := uuid.New().String()
-	refreshTokenHashed, err := jwt.New(jwt.SigningMethodHS256).SignedString([]byte(refreshToken))
+	refreshTokenHashed, err := s.hashToken(refreshToken)
 
 	err = s.repo.CreateNewRefreshToken(ctx, deviceKey, user.ID, refreshTokenHashed)
 
@@ -97,6 +125,11 @@ func (s service) LoginAnonymous(ctx context.Context, deviceKey string) (entity.A
 	authTokens.RefreshToken = refreshToken
 
 	return authTokens, nil
+}
+
+func (s service) hashToken(token string) (string, error) {
+	return jwt.New(jwt.SigningMethodHS256).SignedString([]byte(token))
+
 }
 
 // generateJWT generates a JWT that encodes an identity.

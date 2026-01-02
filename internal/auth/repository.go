@@ -14,8 +14,10 @@ import (
 
 type Repository interface {
 	GetUserByDeviceKey(ctx context.Context, deviceKey string) (entity.User, error)
+	GetUserByUserID(ctx context.Context, userID string) (entity.User, error)
 	CreateAnonymousUser(ctx context.Context, deviceKey string) (entity.User, error)
 	CreateNewRefreshToken(ctx context.Context, deviceKey, userID, hashedValue string) error
+	ValidateRefreshToken(ctx context.Context, deviceKey, hashedValue string) (string, error)
 }
 
 type repistory struct {
@@ -37,6 +39,19 @@ func (r repistory) GetUserByDeviceKey(ctx context.Context, deviceKey string) (en
 	err := r.db.With(ctx).Select("id", "name").From("public.user").Where(dbx.HashExp{
 		"auth_method": entity.AuthMethodAnonymous,
 		"auth_id":     deviceKey,
+		"deleted_at":  nil,
+	}).One(&user)
+
+	return user, err
+}
+
+// GetUserByDeviceKey implements Repository.
+func (r repistory) GetUserByUserID(ctx context.Context, userID string) (entity.User, error) {
+	var user entity.User
+
+	err := r.db.With(ctx).Select("id", "name").From("public.user").Where(dbx.HashExp{
+		"id":         userID,
+		"deleted_at": nil,
 	}).One(&user)
 
 	return user, err
@@ -107,4 +122,23 @@ func (r repistory) CreateNewRefreshToken(ctx context.Context, deviceKey, userID,
 	}
 
 	return err
+}
+
+// ValidateRefreshToken implements Repository.
+func (r repistory) ValidateRefreshToken(ctx context.Context, deviceKey string, hashedValue string) (string, error) {
+	var userID string
+	err := r.db.With(ctx).Select("user_id").From("refresh_token").Where(
+		dbx.NewExp(
+			`device_key={:device_key} 
+			and hashed_value={:hashed_value} 
+			and revoked_at is null and expires_at > {:time}`,
+			dbx.Params{
+				"device_key":   deviceKey,
+				"hashed_value": hashedValue,
+				"time":         time.Now(),
+			},
+		),
+	).Row(&userID)
+
+	return userID, err
 }

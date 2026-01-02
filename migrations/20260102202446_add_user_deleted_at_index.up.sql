@@ -1,0 +1,1 @@
+create index user_deleted_at_idx on public.user (deleted_at);
