@@ -21,14 +21,9 @@ type Service interface {
 	LoginUsername(ctx context.Context, username, password string) (entity.AuthTokens, error)
 	LoginAnonymous(ctx context.Context, deviceKey string) (entity.AuthTokens, error)
 	RefreshTokens(ctx context.Context, refreshToken, deviceKey string) (entity.AuthTokens, error)
-}
 
-// Identity represents an authenticated user identity.
-type Identity interface {
-	// GetID returns the user ID.
-	GetID() string
-	// GetName returns the user name.
-	GetName() string
+	Logout(ctx context.Context, deviceKey string) error
+	GetUser(ctx context.Context, userID string) (entity.User, error)
 }
 
 type service struct {
@@ -41,6 +36,11 @@ type service struct {
 // NewService creates a new authentication service.
 func NewService(signingKey string, tokenExpiration int, repository Repository, logger log.Logger) Service {
 	return service{signingKey, tokenExpiration, repository, logger}
+}
+
+// GetUser implements Service.
+func (s service) GetUser(ctx context.Context, userID string) (entity.User, error) {
+	return s.repo.GetUserByUserID(ctx, userID)
 }
 
 // Login authenticates a user and generates a JWT token if authentication succeeds.
@@ -104,6 +104,10 @@ func (s service) RefreshTokens(ctx context.Context, refreshToken, deviceKey stri
 	return s.createAuthTokens(ctx, user, deviceKey)
 }
 
+func (s service) Logout(ctx context.Context, deviceKey string) error {
+	return s.repo.InvalidateRefreshToken(ctx, CurrentUser(ctx).ID, deviceKey)
+}
+
 func (s service) createAuthTokens(ctx context.Context, user entity.User, deviceKey string) (entity.AuthTokens, error) {
 	var authTokens entity.AuthTokens
 
@@ -133,10 +137,10 @@ func (s service) hashToken(token string) (string, error) {
 }
 
 // generateJWT generates a JWT that encodes an identity.
-func (s service) generateJWT(identity Identity) (string, error) {
+func (s service) generateJWT(user entity.User) (string, error) {
 	return jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"id":   identity.GetID(),
-		"name": identity.GetName(),
+		"id":   user.GetID(),
+		"name": user.GetName(),
 		"exp":  time.Now().Add(time.Duration(s.tokenExpiration) * time.Minute).Unix(),
 	}).SignedString([]byte(s.signingKey))
 }

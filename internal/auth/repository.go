@@ -18,6 +18,7 @@ type Repository interface {
 	CreateAnonymousUser(ctx context.Context, deviceKey string) (entity.User, error)
 	CreateNewRefreshToken(ctx context.Context, deviceKey, userID, hashedValue string) error
 	ValidateRefreshToken(ctx context.Context, deviceKey, hashedValue string) (string, error)
+	InvalidateRefreshToken(ctx context.Context, userID string, deviceKey string) error
 }
 
 type repistory struct {
@@ -49,10 +50,71 @@ func (r repistory) GetUserByDeviceKey(ctx context.Context, deviceKey string) (en
 func (r repistory) GetUserByUserID(ctx context.Context, userID string) (entity.User, error) {
 	var user entity.User
 
-	err := r.db.With(ctx).Select("id", "name").From("public.user").Where(dbx.HashExp{
+	var userDTO struct {
+		ID                    string     `db:"id"`
+		Name                  string     `db:"name"`
+		CustomerID            string     `db:"customer_id"`
+		FCMToken              *string    `db:"fcm_token"`
+		IsNewUser             bool       `db:"is_new_user"`
+		AuthMethod            string     `db:"auth_method"`
+		AuthID                string     `db:"auth_id"`
+		Credits               int        `db:"credits"`
+		CreditsExpiresAt      *time.Time `db:"credits_expires_at"`
+		SubscriptionPlan      *string    `db:"subscription_plan"`
+		SubscriptionExpiresAt *time.Time `db:"subscription_expires_at"`
+		SubscriptionStatus    *string    `db:"subscription_status"`
+		SubscriptionPeriod    *string    `db:"subscription_period"`
+		SubscriptionType      *string    `db:"subscription_type"`
+	}
+
+	err := r.db.With(ctx).Select(
+		"id",
+		"name",
+		"customer_id",
+		"fcm_token",
+		"is_new_user",
+		"auth_method",
+		"auth_id",
+		"credits",
+		"credits_expires_at",
+		"subscription_expires_at",
+		"subscription_status",
+		"subscription_plan",
+		"subscription_period",
+		"subscription_type",
+	).From("public.user").Where(dbx.HashExp{
 		"id":         userID,
 		"deleted_at": nil,
-	}).One(&user)
+	}).One(&userDTO)
+
+	user.Name = userDTO.Name
+	user.ID = userDTO.ID
+	user.AuthID = userDTO.AuthID
+	user.AuthMethod = userDTO.AuthMethod
+	user.IsNewUser = userDTO.IsNewUser
+	user.CustomerID = userDTO.CustomerID
+	if userDTO.FCMToken != nil {
+		user.FCMToken = *userDTO.FCMToken
+	}
+	currenTime := time.Now()
+	if userDTO.CreditsExpiresAt == nil || (userDTO.CreditsExpiresAt).After(currenTime) {
+		user.Credits = userDTO.Credits
+	}
+	subsExpires := userDTO.SubscriptionExpiresAt
+	subsStatus := userDTO.SubscriptionStatus
+	statusActive := string(entity.SubscriptionStatusActive)
+	if (subsExpires == nil || subsExpires.After(currenTime)) &&
+		(subsStatus != nil && (*subsStatus) == statusActive &&
+			userDTO.SubscriptionPlan != nil &&
+			userDTO.SubscriptionPeriod != nil &&
+			userDTO.SubscriptionType != nil) {
+		user.Subscription = &entity.Subscription{
+			Plan:   *userDTO.SubscriptionPlan,
+			Type:   *userDTO.SubscriptionType,
+			Period: *userDTO.SubscriptionPeriod,
+			Status: *userDTO.SubscriptionStatus,
+		}
+	}
 
 	return user, err
 }
@@ -141,4 +203,12 @@ func (r repistory) ValidateRefreshToken(ctx context.Context, deviceKey string, h
 	).Row(&userID)
 
 	return userID, err
+}
+func (r repistory) InvalidateRefreshToken(ctx context.Context, userID string, deviceKey string) error {
+	_, err := r.db.With(ctx).Update("refresh_token",
+		dbx.Params{"revoked_at": time.Now()},
+		dbx.HashExp{"user_id": userID, "device_key": deviceKey},
+	).Execute()
+
+	return err
 }

@@ -18,7 +18,7 @@ create table public.user
     credits bigint not null,
     credits_expires_at TIMESTAMPTZ null,
     subscription_plan varchar null,
-    subscription_type varchar null,
+    subscription_type varchar null, 
     subscription_period varchar null,
     subscription_status varchar null,
     subscription_expires_at TIMESTAMPTZ null,
