@@ -24,6 +24,8 @@ type Config struct {
 	JWTSigningKey string `yaml:"jwt_signing_key" env:"JWT_SIGNING_KEY,secret"`
 	// JWT expiration in hours. Defaults to 72 hours (3 days)
 	JWTExpiration int `yaml:"jwt_expiration" env:"JWT_EXPIRATION"`
+	// Local Storage Path
+	LocalStoragePath string `yaml:"local_storage_path" env:"LOCAL_STORAGE_PATH"`
 }
 
 // Validate validates the application configuration.
@@ -31,6 +33,7 @@ func (c Config) Validate() error {
 	return validation.ValidateStruct(&c,
 		validation.Field(&c.DSN, validation.Required),
 		validation.Field(&c.JWTSigningKey, validation.Required),
+		validation.Field(&c.LocalStoragePath, validation.Required),
 	)
 }
 

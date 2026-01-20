@@ -1,2 +1,3 @@
 dsn: "postgres://127.0.0.1:5435/go_restful?sslmode=disable&user=postgres&password=postgres"
+local_storage_path: "./storage"
 jwt_signing_key: "LxsKJywDL5O5PvgODZhBH12KE6k2yL8E"

@@ -18,6 +18,7 @@ import (
 	"github.com/qiangxue/go-rest-api/internal/auth"
 	"github.com/qiangxue/go-rest-api/internal/config"
 	"github.com/qiangxue/go-rest-api/internal/errors"
+	"github.com/qiangxue/go-rest-api/internal/file"
 	"github.com/qiangxue/go-rest-api/internal/healthcheck"
 	"github.com/qiangxue/go-rest-api/pkg/accesslog"
 	"github.com/qiangxue/go-rest-api/pkg/dbcontext"
@@ -88,12 +89,15 @@ func buildHandler(logger log.Logger, db *dbcontext.DB, cfg *config.Config) http.
 	authService := auth.NewService(cfg.JWTSigningKey, cfg.JWTExpiration, auth.NewRepository(db, logger), logger)
 	authHandler := auth.Handler(cfg.JWTSigningKey, authService)
 
+	fileService := file.NewService(cfg.LocalStoragePath, logger)
+
 	album.RegisterHandlers(rg.Group(""),
 		album.NewService(album.NewRepository(db, logger), logger),
 		authHandler, logger,
 	)
-
 	auth.RegisterHandlers(rg.Group(""), authService, authHandler, logger)
+	file.RegisterHandlers(rg.Group(""), fileService, authHandler, logger)
+
 	return router
 }
 
