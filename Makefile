@@ -65,8 +65,8 @@ version: ## display the version of the API server
 db-start: ## start the database server
 	@mkdir -p testdata/postgres
 	docker run --rm --name postgres -v $(shell pwd)/testdata:/testdata \
-		-v $(shell pwd)/testdata/postgres:/var/lib/postgresql/data \
-		-e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=go_restful -d -p 5432:5432 postgres:16
+	-v $(shell pwd)/testdata/postgres:/var/lib/postgresql \
+	-e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=go_restful -d -p 5435:5432 postgres:18
 
 .PHONY: db-stop
 db-stop: ## stop the database server
@@ -94,7 +94,7 @@ migrate: ## run all new database migrations
 .PHONY: migrate-down
 migrate-down: ## revert database to the last migration step
 	@echo "Reverting database to the last migration step..."
-	@$(MIGRATE) down 1
+	@$(RATE) down 1
 
 .PHONY: migrate-new
 migrate-new: ## create a new database migration
