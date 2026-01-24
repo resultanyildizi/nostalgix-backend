@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	routing "github.com/go-ozzo/ozzo-routing/v2"
+	"github.com/go-ozzo/ozzo-routing/v2/file"
 	"github.com/qiangxue/go-rest-api/internal/errors"
 	"github.com/qiangxue/go-rest-api/pkg/log"
 )
@@ -14,6 +15,7 @@ func RegisterHandlers(r *routing.RouteGroup, service Service, authHandler routin
 	res := resource{service, logger}
 
 	r.Use(authHandler)
+	r.Get("/files/image/*", file.Server(file.PathMap{"/v1/files/image": "/storage"}))
 	r.Post("/files/image", res.uploadImage)
 }
 
@@ -53,9 +55,8 @@ func (r resource) uploadImage(c *routing.Context) error {
 			r.logger.Errorf("Error while reading file content %v", err)
 			return errors.InternalServerError("Error while reading file content")
 		}
-
 		ctx := c.Request.Context()
-		file, err := r.service.UploadImage(ctx, fileBytes, contentType)
+		file, err := r.service.UploadImage(ctx, fileBytes, header.Size, contentType)
 		if err != nil {
 			return err
 		}

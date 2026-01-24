@@ -89,7 +89,11 @@ func buildHandler(logger log.Logger, db *dbcontext.DB, cfg *config.Config) http.
 	authService := auth.NewService(cfg.JWTSigningKey, cfg.JWTExpiration, auth.NewRepository(db, logger), logger)
 	authHandler := auth.Handler(cfg.JWTSigningKey, authService)
 
-	fileService := file.NewService(cfg.LocalStoragePath, logger)
+	fileService := file.NewService(
+		file.NewRepository(db, logger),
+		file.NewLocalStorage(cfg.LocalStoragePath, logger),
+		logger,
+	)
 
 	album.RegisterHandlers(rg.Group(""),
 		album.NewService(album.NewRepository(db, logger), logger),
