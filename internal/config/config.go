@@ -11,7 +11,7 @@ import (
 
 const (
 	defaultServerPort       = 8080
-	defaultJWTExpirationMin = 15
+	defaultJWTExpirationMin = 60
 )
 
 // Config represents an application configuration.
@@ -26,6 +26,12 @@ type Config struct {
 	JWTExpiration int `yaml:"jwt_expiration" env:"JWT_EXPIRATION"`
 	// Local Storage Path
 	LocalStoragePath string `yaml:"local_storage_path" env:"LOCAL_STORAGE_PATH"`
+	// Cloudflare R2 Configuration
+	CloudflareR2BucketName       string `yaml:"cloudflare_r2_bucket_name" env:"CLOUDFLARE_R2_BUCKET_NAME"`
+	CloudflareR2AccountID        string `yaml:"cloudflare_r2_account_id" env:"CLOUDFLARE_R2_ACCOUNT_ID"`
+	CloudflareR2AccessKeyID      string `yaml:"cloudflare_r2_access_key_id" env:"CLOUDFLARE_R2_ACCESS_KEY_ID"`
+	CloudflareR2AccessKeySecrect string `yaml:"cloudflare_r2_access_key_secret" env:"CLOUDFLARE_R2_ACCESS_KEY_SECRET"`
+	CloudflareR2PublicDomain     string `yaml:"cloudflare_r2_public_domain" env:"CLOUDFLARE_R2_PUBLIC_DOMAIN"`
 }
 
 // Validate validates the application configuration.
@@ -34,6 +40,11 @@ func (c Config) Validate() error {
 		validation.Field(&c.DSN, validation.Required),
 		validation.Field(&c.JWTSigningKey, validation.Required),
 		validation.Field(&c.LocalStoragePath, validation.Required),
+		validation.Field(&c.CloudflareR2AccessKeyID, validation.Required),
+		validation.Field(&c.CloudflareR2BucketName, validation.Required),
+		validation.Field(&c.CloudflareR2AccountID, validation.Required),
+		validation.Field(&c.CloudflareR2AccessKeySecrect, validation.Required),
+		validation.Field(&c.CloudflareR2PublicDomain, validation.Required),
 	)
 }
 

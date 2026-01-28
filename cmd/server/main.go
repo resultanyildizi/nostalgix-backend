@@ -9,6 +9,10 @@ import (
 	"os"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	awsConfig "github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	dbx "github.com/go-ozzo/ozzo-dbx"
 	routing "github.com/go-ozzo/ozzo-routing/v2"
 	"github.com/go-ozzo/ozzo-routing/v2/content"
@@ -28,7 +32,8 @@ import (
 // Version indicates the current version of the application.
 var Version = "1.0.0"
 
-var flagConfig = flag.String("config", "./config/local.yml", "path to the config file")
+// var flagConfig = flag.String("config", "../../../nostalgix.yml", "path to the config file")
+var flagConfig = flag.String("config", "config/local.yml", "path to the config file")
 
 func main() {
 	flag.Parse()
@@ -56,11 +61,30 @@ func main() {
 		}
 	}()
 
+	awsCfg, err := awsConfig.LoadDefaultConfig(context.TODO(),
+		awsConfig.WithCredentialsProvider(
+			credentials.NewStaticCredentialsProvider(
+				cfg.CloudflareR2AccessKeyID,
+				cfg.CloudflareR2AccessKeySecrect,
+				"",
+			),
+		),
+		awsConfig.WithRegion("auto"), // Required by SDK but not used by R2
+	)
+	if err != nil {
+		logger.Error(err)
+		os.Exit(-1)
+	}
+
+	awsClient := s3.NewFromConfig(awsCfg, func(o *s3.Options) {
+		o.BaseEndpoint = aws.String(fmt.Sprintf("https://%s.r2.cloudflarestorage.com", cfg.CloudflareR2AccountID))
+	})
+
 	// build HTTP server
 	address := fmt.Sprintf(":%v", cfg.ServerPort)
 	hs := &http.Server{
 		Addr:    address,
-		Handler: buildHandler(logger, dbcontext.New(db), cfg),
+		Handler: buildHandler(logger, dbcontext.New(db), awsClient, cfg),
 	}
 
 	// start the HTTP server with graceful shutdown
@@ -73,7 +97,7 @@ func main() {
 }
 
 // buildHandler sets up the HTTP routing and builds an HTTP handler.
-func buildHandler(logger log.Logger, db *dbcontext.DB, cfg *config.Config) http.Handler {
+func buildHandler(logger log.Logger, db *dbcontext.DB, awsClient *s3.Client, cfg *config.Config) http.Handler {
 	router := routing.New()
 
 	router.Use(
@@ -91,7 +115,8 @@ func buildHandler(logger log.Logger, db *dbcontext.DB, cfg *config.Config) http.
 
 	fileService := file.NewService(
 		file.NewRepository(db, logger),
-		file.NewLocalStorage(cfg.LocalStoragePath, logger),
+		// file.NewLocalStorage(cfg.LocalStoragePath, logger),
+		file.NewCloudStorage(awsClient, cfg.CloudflareR2BucketName, cfg.CloudflareR2PublicDomain, logger),
 		logger,
 	)
 

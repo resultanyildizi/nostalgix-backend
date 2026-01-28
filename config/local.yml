@@ -1,3 +1,8 @@
 dsn: "postgres://127.0.0.1:5435/go_restful?sslmode=disable&user=postgres&password=postgres"
 local_storage_path: "./storage"
+cloudflare_r2_access_key_id: "access-key-id"
+cloudflare_r2_access_key_secret: "access-key-secret"
+cloudflare_r2_account_id: "account-id"
+cloudflare_r2_bucket_name: "nostalgix"
+cloudflare_r2_public_domain: "https://pub-910c78dfb4734430ab630c808754deeb.r2.dev"
 jwt_signing_key: "LxsKJywDL5O5PvgODZhBH12KE6k2yL8E"
