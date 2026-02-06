@@ -4,6 +4,7 @@ import (
 	stdbytes "bytes"
 	"context"
 	stderrors "errors"
+	"fmt"
 	"path/filepath"
 	"time"
 
@@ -66,5 +67,6 @@ func (c CloudStorage) WriteFile(ctx context.Context, file entity.File, bytes []b
 
 // GetFileURL implements FileStorage.
 func (c CloudStorage) GetFileURL(_ context.Context, file entity.File) (string, error) {
-	return filepath.Join(c.publicDomain, file.Subject, file.GetName()), nil
+	// return filepath.Join(c.publicDomain, file.Subject, file.GetName()), nil
+	return fmt.Sprintf("%s/%s/%s", c.publicDomain, file.Subject, file.GetName()), nil
 }
