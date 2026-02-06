@@ -57,7 +57,7 @@ func (r resource) create(c *routing.Context) error {
 	var input CreateAlbumRequest
 	if err := c.Read(&input); err != nil {
 		r.logger.With(c.Request.Context()).Info(err)
-		return errors.BadRequest("")
+		return errors.BadRequest("", "")
 	}
 	album, err := r.service.Create(c.Request.Context(), input)
 	if err != nil {
@@ -71,7 +71,7 @@ func (r resource) update(c *routing.Context) error {
 	var input UpdateAlbumRequest
 	if err := c.Read(&input); err != nil {
 		r.logger.With(c.Request.Context()).Info(err)
-		return errors.BadRequest("")
+		return errors.BadRequest("", "")
 	}
 
 	album, err := r.service.Update(c.Request.Context(), c.Param("id"), input)

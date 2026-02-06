@@ -1,9 +1,10 @@
 package errors
 
 import (
-	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"net/http"
 	"sort"
+
+	validation "github.com/go-ozzo/ozzo-validation/v4"
 )
 
 // ErrorResponse is the response that represents an error.
@@ -68,13 +69,14 @@ func Forbidden(msg string) ErrorResponse {
 }
 
 // BadRequest creates a new error response representing a bad request (HTTP 400)
-func BadRequest(msg string) ErrorResponse {
+func BadRequest(msg string, code string) ErrorResponse {
 	if msg == "" {
 		msg = "Your request is in a bad format."
 	}
 	return ErrorResponse{
 		Status:  http.StatusBadRequest,
 		Message: msg,
+		Details: map[string]string{"error_code": code},
 	}
 }
 

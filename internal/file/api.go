@@ -29,20 +29,20 @@ func (r resource) uploadImage(c *routing.Context) error {
 
 	if err != nil {
 		r.logger.Errorf("Error parsing the form data %v", err)
-		return errors.BadRequest(fmt.Sprintf("Error parsing the form data %v", err))
+		return errors.BadRequest(fmt.Sprintf("Error parsing the form data %v", err), "invalid_file")
 	}
 
 	file, header, err := c.Request.FormFile("image")
 
 	if err != nil {
 		r.logger.Errorf("Error reading form file %v", err)
-		return errors.BadRequest(fmt.Sprintf("Error reading form file %v", err))
+		return errors.BadRequest(fmt.Sprintf("Error reading form file %v", err), "invalid_file")
 	}
 
 	defer file.Close()
 
 	if header.Size > (10 << 20) {
-		return errors.BadRequest("Image file is too big. Maximum 5 MiB allowed.")
+		return errors.BadRequest("Image file is too big. Maximum 5 MiB allowed.", "file_size_too_big")
 	}
 
 	contentType := header.Header.Get("content-type")
@@ -63,7 +63,7 @@ func (r resource) uploadImage(c *routing.Context) error {
 		return c.WriteWithStatus(file, http.StatusOK)
 	default:
 		r.logger.Errorf("Invalid image type, %s is not supported", contentType)
-		return errors.BadRequest("Invalid image type. Not supported.")
+		return errors.BadRequest("Invalid image type. Not supported.", "file_type_not_supported")
 	}
 
 	return nil

@@ -38,7 +38,7 @@ func (r resource) loginUsername(c *routing.Context) error {
 
 	if err := c.Read(&req); err != nil {
 		r.logger.With(c.Request.Context()).Errorf("invalid request: %v", err)
-		return errors.BadRequest("")
+		return errors.BadRequest("", "")
 	}
 	authTokens, err := r.service.LoginUsername(c.Request.Context(), req.Username, req.Password)
 	if err != nil {
@@ -54,12 +54,12 @@ func (r resource) loginAnonymous(c *routing.Context) error {
 
 	if err := c.Read(&req); err != nil {
 		r.logger.With(c.Request.Context()).Errorf("invalid request: %v", err)
-		return errors.BadRequest("")
+		return errors.BadRequest("", "")
 	}
 
 	if req.DeviceKey == "" {
 		r.logger.With(c.Request.Context()).Errorf("invalid request")
-		return errors.BadRequest("Device key is required ")
+		return errors.BadRequest("Device key is required", "")
 	}
 
 	authTokens, err := r.service.LoginAnonymous(c.Request.Context(), req.DeviceKey)
@@ -77,12 +77,12 @@ func (r resource) refreshTokens(c *routing.Context) error {
 
 	if err := c.Read(&req); err != nil {
 		r.logger.With(c.Request.Context()).Errorf("invalid request: %v", err)
-		return errors.BadRequest("")
+		return errors.BadRequest("", "")
 	}
 
 	if req.DeviceKey == "" || req.RefreshToken == "" {
 		r.logger.With(c.Request.Context()).Errorf("invalid request")
-		return errors.BadRequest("Device key is required ")
+		return errors.BadRequest("Device key is required", "")
 	}
 
 	authTokens, err := r.service.RefreshTokens(c.Request.Context(), req.RefreshToken, req.DeviceKey)
@@ -110,12 +110,12 @@ func (r resource) logout(c *routing.Context) error {
 	}
 	if err := c.Read(&req); err != nil {
 		r.logger.With(c.Request.Context()).Errorf("invalid request: %v", err)
-		return errors.BadRequest("")
+		return errors.BadRequest("", "")
 	}
 
 	if req.DeviceKey == "" {
 		r.logger.With(c.Request.Context()).Errorf("invalid request")
-		return errors.BadRequest("Device key is required ")
+		return errors.BadRequest("Device key is required", "")
 	}
 
 	err := r.service.Logout(ctx, req.DeviceKey)
